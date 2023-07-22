@@ -1,0 +1,510 @@
+---
+title: |
+  SimJogja: A Spatial Microsimulation Approach to COVID-19 Vulnerability and Impact Assessment of the Local Labour Market
+subtitle: |
+  DRAFT MANUSCRIPT
+author: 
+  - Immanuel Satya Pekerti^[Faculty of Spatial Science, University of Groningen, i.s.pekerti@student.rug.nl]
+bibliography: ref.bib
+csl: apa.csl
+abstract: |
+  | I build a set of static spatial microsimulation models, called *SimJogja*, to address the need to identify the geographic distribution of vulnerable demographic groups and affected workers across the Indonesian province of D.I. Yogyakarta. The simulation uses a deterministic reweighting method, namely the iterative proportional fitting (IPF). The models accurately estimate and map the concentration of vulnerable groups and affected workers at the village level. Such fine granularity allows us to avoid the modifiable areal unit problem (MAUP). This is the first known use of spatial microsimulation in the COVID-19 context to assess the socio-economic and labour market impact of the pandemic.
+  |
+  | \textbf{Keyword} : spatial microsimulation; COVID-19; local labour market; Yogyakarta
+link_citations: TRUE
+fontsize: 12pt
+header-includes:
+   - \usepackage{multirow}
+   - \usepackage{longtable}
+   - \usepackage{graphicx}
+output:
+  pdf_document:
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+library("ggplot2")
+library("ggalt")
+library("readxl")
+library("tidyverse")
+library("lubridate")
+
+# data_diy_sectoral_working <- read_xlsx("../report/diy_sectoral_working.xlsx")
+# 
+# data_diy_sectoral_working$Sector <- factor(data_diy_sectoral_working$Sector, levels = data_diy_sectoral_working$Sector)
+# data_diy_sectoral_working$sign <- ifelse(data_diy_sectoral_working$`Absolute Change` > 0, "pos", "neg")
+# 
+# data_diy_sectoral_share <- read_xlsx("../report/diy_sectoral_share.xlsx") %>% 
+#   arrange(share2019) %>% 
+#   mutate(sector=factor(sector, levels=sector))
+
+data_covid <- read_xlsx("../data_desc/data_covidcaseevolution.xlsx")
+data_covid$date <- as.Date(data_covid$date)
+
+```
+
+\newpage
+\tableofcontents
+
+\newpage
+
+# Introduction
+
+The impact of COVID-19 pandemic is overarching and multifaceted.
+Overarching, such that it affected various aspects of our society, and multifaceted, such that its effects varied globally and locally.
+The economy in general is affected, but more importantly, the labour market is one part of the economy that beared the most brunt.
+The decline in employment level, mirrored by rise in unemployment [@ing_indonesian_2022], exit from labour market [@aum_covid-19_2021], and disproportionate impact across demographic groups [@adams-prassl_inequality_2020; @lee_hit_2021], threaten the livelihood of the most vulnerable.
+Left unchecked, the possibility of labour market crisis can trigger a bigger, more serious, social crisis arising from economic inequality [@soares_labour_2022].
+Moreover, such decline in employment could also reduce earnings, which could have adverse multiplier impact towards the whole economy.
+
+Much has been done in attempt to understand the problem and offer a suitable solution.
+Alas, previous studies in labour economics often focus only at one part of the problem: They focused on who, but not where, and on macro, but not micro.
+
+Understanding of where is a necessary complement to the understanding of who.
+Previous studies have found the evidence of spatial inequalities, both in health [@campbell_simalba_2016; @ballas_using_2006; @broomhead_oral_2023] and various economic indicators [@zhao_inequality_2021].
+Additionally, we also know that vulnerable demographic groups are concentrated in a particular area within a geographical scope [@desmet_jue_2022].
+Investigating the heterogeneous impact of COVID-19 across space going forward has its merit.
+First, it unveils the possible role of geography in determining labour market outcomes of a certain location.
+Second, it helps policymakers to pinpoint the most impacted area.
+Government plays a critical role to provide assistance towards the impacted to avert further problems.
+This can be achieved through the means of effective assistance targeting, in particular the geographic targeting.
+
+Given the importance of geography, zooming in to a more micro level of geography could also help us better understand the nature of the impact.
+Previous studies often include geography in their studies only in the form of urban-rural dichotomy [@cueva_impacts_2021; @hamann_how_2023; @koczan_not_2022; @lee_hit_2021].
+I argue that this is not enough.
+There could be more variations than mere rural-urban dichotomy is able to capture or even explain.
+Finer disaggregation or downscaling could also be helpful for three reasons.
+First, finer disaggregation gives us a new insights that is previously unavailable due to the limit of survey design.
+Survey observations are often not geocoded, or only geocoded to a large geographical scale (e.g. province, districts).
+The ability to downscale the data provides us with the opportunity to observe the spatial pattern or concentration with higher detail.
+Second, this higher detail enables us to better explain variations across space.
+@chakir_spatial_2009 argues and points out some studies that might have benefited from finer resolution of data, since different spatial pattern would also lead to different outcomes over space.
+For example, we might not be able to understand that some location that generates more jobs and economic activities (e.g. markets, schools, office area) are more impacted by COVID-19 with aggregated dataset, but we might see it using a finer disaggregated dataset.
+Third, the ability to produce finely disaggregated data could help promote policy effectiveness to help the survival of businesses and workers.
+Assistance targeting method, such as geographic targeting, has better accuracy with geographically finer resolution data [@baker_poverty_1994; @elbers_poverty_2007].
+
+Therefore, I propose spatial microsimulation as a tool to fill the gap.
+Spatial microsimulation is a method to generate large-scale synthetic population microdata and assign geography for policy evaluation at the geographically micro level [@ballas_using_2006].
+The ability enables us to observe the geographical distribution of the outcome in a more detailed fashion.
+Such ability is also useful for investigation of cases in developing countries given the scarcity of high-quality data with geographical information [@ballas_geography_2005].
+The method also features the ability to run a what-if analysis for to analyse the outcome of a policy scenario [for example, see @ballas_modelling_2006].
+
+The aim of this paper is to investigate the spatial pattern of COVID-19 impact on local labour market outcomes across D.I. Yogyakarta and demonstrate how spatial microsimulation can achieve that by building a set of static microsimulation models called *SimJogja*.
+This paper describes the model and how the model could achieve the said objective.
+The expected outcomes of this paper is not only of academic importance, but also policy.
+Academically, this paper is an attempt to explore the nature of COVID-19 impact on local labour market.
+This paper also hopes to (i) help with the practice of policy targeting, namely the geographic targeting, and (ii) illustration of how spatial microsimulation can estimate the policy scenario
+SimJogja is the first spatial microsimulation model for the region of D.I Yogyakarta.
+The model is not the first one to simulate the local labour market [@ballas_gis_2000], but is the first one to implement this for COVID-19 impact evaluation.
+
+I use the case of an Indonesian province of *Daerah Istimewa Yogyakarta* (Yogyakarta Special Region/D.I. Yogyakarta) for two reasons.
+First, the economic activity in this province relies heavily on the tourism industry.
+As we have understood, the industry is one of the most affected due to the nature of its activity.
+@sun_who_2021 estimates that, among other tourism-reliant regions, 242,000 jobs in D.I. Yogyakarta are vulnerable to the pandemic, second only to Bali with 820,000 vulnerable jobs.
+Second, high-quality village-level demographic data is available for villages across the province.
+Such data is essential to build a model with reliable estimation result.
+Its application on the case of Indonesia as a developing country where high-quality geographical data is not available also highlights its benefit on the study of developing countries.
+
+
+![Reference Map](C:/Users/satya/OneDrive/WORKBENCH/Personal Study/1B - Thesis/proposals/spatialmicrosim/viz/refmap.png)
+
+# Which Labour Market Indicators to Examine?
+
+The first step is to identify the groups and indicators that are related to the pandemic to provide direction for my analysis.
+Studies have found various demographic groups that are hardest hit during the pandemic: women, youth, the less educated, racial minority, informal workers, workers with temporary contracts, low-skilled and low-paying jobs, and jobs with tasks that can't be done remotely [@lee_hit_2021; @international_labour_organization_covid-19_2020; @lee_labour_2020; @aum_covid-19_2021; @adams-prassl_inequality_2020].
+The impact of COVID-19 also hit some sectors hard, such as tourism and leisure activity [@lewis_6_2021; @wren-lewis_economic_2020].
+I decided to focus on four groups: informal workers, workers in the tourism sector, along with women and youth workers.
+These groups are chosen based on different notions of vulnerability.
+Informal workers are chosen due to their inability to withstand shocks [@international_labour_organization_covid-19_2020].
+Workers in the tourism sector is interesting since they are exposed to the possible employment effect of output decline as was suggested by @lewis_6_2021.
+Women and young workers are vulnerable due to their over-representation in vulnerable industries or jobs with unfavourable characteristics (e.g. low-skill, low-paying jobs, temporary contract arrangement, etc.) [@lee_labour_2020; @adams-prassl_inequality_2020]
+
+Regarding the labour market outcomes, @lewis_6_2021 suggests that there is no single reliable indicator.
+He points out that, while unemployment is proper to use in urbanised and developed economies, it might not be true for the case of developing countries.
+In concordance, @lee_labour_2020 suggests that unemployment is not a proper indicator of work disruption, as there are numerous cases of workers being stood down or temporarily not working, reduction of working hours, or being forced to exit the labour force altogether [see for example @coibion_labor_2020; @leyva_informal_2023; @lemieux_initial_2020].
+The share of informal workers is another interesting indicator to follow.
+I discuss some of these variables further.
+
+The share of informal employment is essential given its high share in Indonesia.
+The share for Indonesia and D.I. Yogyakarta, was 55.88 per cent and 51.64 per cent in 2019, respectively.
+Any shock to informal jobs will have a widespread and significant effect towards the economy.
+
+The debate on COVID-19's impact towards informality extends the importance of this measure.
+@lee_labour_2020 suggest that informal work was usually the last-resort option of the thrown-out formal workers, but is now no longer an option due to the mobility restriction.
+This is well-aligned with the findings of @leyva_informal_2023 who find that decline in employment also sees a decline in informality rate due to informal productivity shock.
+On the contrary, @ing_indonesian_2022 find a rise in the number of informal workers in the form of unpaid family workers and casual farmers for the Indonesian case.
+
+Another important thing is the association between working hours and informal jobs.
+@lewis_6_2021 pointed out that reduction in working hours is a phenomenon more prevalent among informal workers.
+This might be one of the labour-saving strategies employed by firms to survive.
+Hence the need to examine the working hours reduction along with informality rate.
+
+Changes in the unemployment rate and labour force participation rate also warrant a close examination.
+Early examination by @coibion_labor_2020 shows that the decline in employment is not mirrored by an increase in the unemployment rate, but by a decrease in the labour force participation rate.
+This is confirmed by @aum_covid-19_2021.
+They guess that this is due to the unemployed waiting out the pandemic to get a better chance on job search, or expecting to go back to their previous employment.
+@coibion_labor_2020 points to early retirement given the raising figure of retired persons and workers declaring out of the labour force to retire.
+Spatial microsimulation can also examine whether different transition prevails in different places.
+
+# How Spatial Microsimulation Helps Geographic Targeting Process
+
+This section gives a brief description of geographic targeting and shows the gap that spatial microsimulation can fill.
+Geographic targeting is one of the social assistance targeting methods, besides demographic targeting, individual/household targeting, and self-targeting [@de_janvry_development_2021].
+The method relies on the mapping of impoverished households or individuals to allocate social assistance programmes.
+
+The advantage of geographic targeting compared to its counterparts is its simplicity [@baker_poverty_1994].
+It is administratively simple to implement and better in terms of cost-efficiency compared to untargeted or uniform transfer schemes [@mason_targeting_1996].
+A simulation study by @baker_poverty_1994 shows that leakage^[Leakage refers to the share of benefits received by someone outside of the targeted category.] and undercoverage^[Undercoverage refers to the share of people under targeted categories that don't receive the benefits.] resulting from geographic targeting are somewhat lower than the uniform transfer scheme.
+
+The application of this approach should also consider the nature of the problem.
+I have yet to understand whether the distribution of the vulnerable and the affected are geographic in nature.
+@ravallion_poor_1999 investigate the effectiveness of geographic targeting given the freedom to migrate.
+They address the criticism that geographic targeting wouldn't be effective in that setting, since benefit allocation based on geography would only induce migration to a region which received more benefits.
+They argue that geographic targeting would still be effective since migration doesn't happen, and there are some geographic patterns in the geographical distribution of poverty.
+Despite that, they also suggest that geography doesn't necessarily explain the incidence of poverty.
+They found a spatial autocorrelation in household characteristics that are conducive to poverty, and the spatial pattern emerges from the sorting process through migration.
+Along with another study done by @mason_targeting_1996, they suggest to my context that geographic targeting might not be the best to use on its own, but to use in complement with other targeting methods and addresses the principal source of vulnerability.
+
+Spatial microsimulation's ability to create a finer geographical disaggregation could also be beneficial to the geographical targeting process.
+@baker_poverty_1994 and @elbers_poverty_2007 found through their simulation study that disaggregation improves the accuracy and efficiency of targeting, achieving the same outcome with less cost.
+The advantage of being simple combined with the improved accuracy makes spatial microsimulation a promising method to be applied in this context.
+
+# Data and Methodology
+
+## Data Description
+
+The model will use *Survei Angkatan Kerja Nasional* (Indonesian National Labour Force Survey/SAKERNAS) and the village statistics provided by the Provincial Government of D.I. Yogyakarta^[Data were retrieved from https://kependudukan.jogjaprov.go.id/].
+The scope of data will include villages and workers who reside in the province of D.I. Yogyakarta during each of the survey periods.
+There are 438 villages within our dataset, along with 9,249 observed individuals in 2020 and 9,414 individuals in 2019.
+Although it might be possible, I haven't taken into account the various migration pattern of the workers (e.g. in-migration, out-migration, or migration within the region).
+No migration is assumed to avoid unnecessary overcomplication for now.
+
+## Brief Introduction to Spatial Microsimulation
+
+Spatial microsimulation is one of the small area estimation methods.
+Small area estimation concerns the production of reliable estimates of geographical units' characteristics with small or no samples [@pfeffermann_new_2013].
+The main advantage of spatial microsimulation compared to other traditional small area estimation methods is its ability to construct whole synthetic microdata, or made-up data, for each geographical unit [@tanton_review_2013].
+This enables us to go beyond a point estimate of each variable and get deeper insights from the cross-tabulation of variables of interest.
+Spatial microsimulation is also a way to add geography, even on a more micro scale, to the existing individual-level survey data [@lovelace_spatial_2016; @ballas_geography_2005].
+
+There are a variety of ways for spatial microsimulation to work.
+Spatial microsimulation can generate synthetic microdata with aggregate characteristics that match the reference dataset (e.g. demographic statistics), which we call synthetic reconstruction.
+It could also assign a new weight to each observation for each of the geographical units, which we call reweighting.
+The principle of reweighting works by adjusting how much an individual observation with a unique set of characteristics is represented in a geographical unit.
+There are also two different ways of assigning new weights according to their process: probabilistic and deterministic.
+@tanton_review_2013 provides a complete review of the available models.
+
+This study uses a deterministic reweighting approach, namely the iterative proportional fitting (IPF).
+IPF involves two types of variables: constraint and target.
+Constraint variables appear both in small area tables and the survey sample.
+They are usually more common variables that represent characteristics (e.g. age, educational attainment, gender, etc.).
+Target variables are usually only available on the survey sample dataset.
+They are usually more specific variables to be examined (e.g. unemployment status, earnings, etc.).
+Adjustment is made by calculating how likely a unique observation in the survey sample appear in a synthetic dataset based on the constraint variables value in the small area tables.
+This is done iteratively for each constraint variable, hence the name iterative proportional fitting.
+The accuracy of the synthetic dataset relies on the correlation between the constraint and target variables. 
+In other words, it relies on how well a set of constraint characteristics could represent a set of target characteristics.
+I suggest readers consult @lomax_estimating_2016, which is also intended for nonexpert users, for a more extensive explanation of the way IPF works, especially on the iterative nature of the method.
+
+## Identification Strategy
+
+This paper has two general aims: to estimate the geographical distribution of the vulnerable groups and changes in labour market outcomes.
+The model-building process uses R software [@r_core_team_r_2023] and the `ipfp` package [@blocker_ipfp_2022] as described by @lovelace_spatial_2016.
+I will discuss the identification strategy for each of the aims below.
+
+Estimating the geographical distribution of the vulnerable groups is straightforward.
+I build a static spatial microsimulation model which maps the representation of the most vulnerable demographic groups across villages in D.I. Yogyakarta.
+The microdata sample used in this model is based on the August 2019 wave of SAKERNAS. 
+This model aims to map the most vulnerable villages before the onset of COVID-19 in February 2020.
+
+Identifying the geographical distribution of changes in labour market outcomes adds a bit more to the first model.
+I build another static model, representing the post-COVID outbreak.
+I have now two static models, with the first one based on the August 2019 wave of SAKERNAS, while the second one uses the August 2020 wave.
+Since there is no village proliferation or changes in the number of villages, finding the difference in variables value between the two periods is rather straightforward.
+
+The constraint variables in this model are age, gender, age groups, occupational groups, and educational attainment.
+Each of the variables is divided into several categories.
+A complete list of these categories is available in the Appendix.
+The target variables are the variables that will be used to assess vulnerable demographic groups, such as working women, working youth, informal workers, and workers in the accommodation, food, and beverage industry.
+These variables are not an exhaustive list of the vulnerable groups and measures of labour market change.
+This won't be a concern since the main purpose of this paper is to demonstrate how the method works.
+
+I found a limitation in using SAKERNAS data in this model to identify the changes in labour market outcomes.
+As discussed previously, @world_bank_indonesia_2020 found that around 70 per cent who lost their job early in the pandemic found their way back into employment by early August.
+The estimation I get by using the microdata might not show the full extent of the COVID-19 labour market impact.
+
+## Model Validation
+
+My model would only be meaningful if it accurately resembles the actual situation.
+Hence the need for validation.
+Validation is done by comparing actual and simulated values.
+Spatial microsimulation by reweighting is usually validated using internal and external validation.
+Internal validation refers to the comparison between values of constraint variables of the input dataset and simulated dataset, while external validation refers to the comparison between values of target variables.
+
+In this study, I don't perform internal validation since it would produce near-perfect results for the IPF reweighting method (see @panori_simathens_2017, for example).
+@tanton_validation_2012 suggest that external validation should be done against a different dataset.
+Restricted by data availability, I compare the mean of target variables aggregated value between simulated data with SAKERNAS survey data on the province level.
+Since the simulated weight and weight assigned by SAKERNAS went through two completely different processes, the SAKERNAS weight can be used for validation since its formulation is external to the estimation process [@tanton_validation_2012].
+
+The result of the external validation is provided in Table 1.
+I follow @panori_simathens_2017 for the external validation procedure by looking at the difference in the average value for target variables after aggregation.
+The table only displays variables which we will discuss.
+The validation of more target variables can be seen in the appendix.
+
+To begin the discussion on the validation result, it is worth noting that there is no known well-defined rule of what constitutes an acceptable result.
+SimAthens' claim that their model is 'extremely satisfactory' is completely arbitrary.
+Therefore, I would not claim that my model is 'satisfactory' and provide my result for comparative purposes instead.
+
+The largest difference is seen for the share of youth in employment, which is underestimated by 3.66 percentage points in the 2019 model.
+Another considerable difference is seen for the labour force participation rate, which is underestimated by 3.16 per cent in the 2019 model.
+The concern lies not in the mere difference, but in the magnitude of the time trend.
+The labour force participation rate dropped 5.18 percentage points between 2019 and 2020 using weight assigned by SAKERNAS, while it only dropped 0.81 percentage points using simulated value.
+This is particularly concerning since I'll be using the difference between both models.
+One might wonder if the difference in the share of youth employment would be even more alarming since it sees a change of direction between years.
+It is not a problem since the 2020 value of the variable won't be used in my analysis.
+
+\begin{center}
+{\setlength\tabcolsep{2pt}
+  \begin{longtable}{p{4cm}ccc | ccc}
+  \caption{External Validation of Target Variables}\\
+    \hline
+    \multirow{2}{*}{Variable} & \multicolumn{3}{c}{2019} & \multicolumn{3}{c}{2020}\\\cline{2-7}
+& Simulated & SAKERNAS & Difference & Simulated & SAKERNAS & Difference\\
+    \hline
+    Working Hours & 36.421 & 37.153 & -0.73 & 34.796 & 35.340 & -0.54 \\
+    Unemployment Rate & 5.54 & 3.04 & 2.50 & 5.59 & 5.38 & 0.21 \\
+    Labour Force Participation Rate & 69.67 & 72.83 & -3.16 & 68.86 & 67.65 & 1.21 \\
+    Share of Informal Workers & 50.50 & 50.23 & 0.27 & 51.17 & 53.14 & -1.97 \\
+    Share of Women in Employment & 41.75 & 43.61 & -1.86 & 43.18 & 44.20 & -1.01 \\
+    Share of Youth in Employment & 18.41 & 22.07 & -3.66 & 19.47 & 21.15 & -1.68 \\
+    Sectoral Share: {Accomodation \& FnB} & 7.78 & 9.39 & -1.60 & 6.47 & 8.24 & -1.77 \\
+    \hline
+    \multicolumn{7}{l}{\small Note: Every variables are in percentage, except for working hours which is in average hours} \\
+  \end{longtable}
+}
+\end{center}
+
+The reason for inaccuracy might be the small number of samples [@tanton_validation_2012].
+Spatial microsimulation relies on the inference of target variables based on the available combination of constraint variables' characteristics.
+A small selection of samples means that there are limited combinations of target variable characteristics that can be represented by a certain combination of constraint variable characteristics.
+In my case, I have 1,235 cases of working youth out of 9,414 samples used in the 2019 model.
+These samples are then used to infer the labour characteristics of 765,969 working youth out of the 2,905,051 working-age population.
+
+Another thing to point out is how the inaccuracy appears in the model.
+The over- or underestimation can have a certain pattern: spread over all geographical units or concentrated and changes only a select few geographical units.
+There was no known way to examine this issue.
+
+# Simulation Results
+
+## Estimation of Vulnerable Population
+
+I discuss here the simulation result, and I start with the identification of the geographic distribution of vulnerable demographic groups.
+I select a few vulnerable categories to display (see Figure 3).
+The selected variables are the value of several categories as a share of employment in D.I. Yogyakarta for the year 2019.
+These categories are (i) share of informal workers, (ii) sectoral share of employment for accommodation, food, and beverage industry, (iii) share of women in employment, and (iv) share of youth (15-29 years old) in employment.
+
+The share of informal workers is mostly concentrated outside of the urban core of Kota Yogyakarta.
+The concentration of high informality rate is found on the southern coast and northern part of Gunung Kidul and the Menoreh Hills on the western edge of the province, while low informality rate is concentrated in the urbanised border area between the Kota Yogyakarta and Sleman.
+Interestingly, the share of women in employment somewhat mimics the distribution of informal workers.
+High share of women employment is concentrated on the southern coast of Gunung Kidul and Menoreh Hills.
+This might reflect the empirical finding that women are vulnerable to the pandemic due to its over-representation in informal or low-paying jobs [@aum_covid-19_2021].
+
+Next is the share of employment in tourism-related industry.
+I use the accommodation and food, and beverage industry to represent the tourism industry in my analysis.
+Concentration of high employment rate in accommodation, food, and beverage is found around the urban areas and its immediate vicinity.
+Another area with high share of employment is located around Wonosari.
+A lower level of employment share is present also on other known tourist spots, such as the base of Mount Merapi, Parangtritis Beach area, and Gunung Kidul beaches.
+
+The share of youth employment is mostly concentrated around the urban area. 
+Some sporadic concentration is also found on the northern edge of Gunung Kidul and a spot somewhere along its coast.
+The pattern does not correspond with any pattern of other variables.
+This might be associated with the correspondence between the type of jobs available in a particular places and the type of jobs Indonesian youth would be associated with.
+
+The general impression that one can conclude from these results is that the urban core and remote part of the province are both vulnerable, but in different ways.
+We see how tourism-related jobs and youth employment were concentrated mostly around the urban areas, while informal and women workers were mostly situated in more remote areas.
+
+![Geographical Distribution of Vulnerable Groups in 2019](C:/Users/satya/OneDrive/WORKBENCH/Personal Study/1B - Thesis/proposals/spatialmicrosim/viz/est1.png)
+
+![Changes in Labour Market Outcomes, 2019-2020](C:/Users/satya/OneDrive/WORKBENCH/Personal Study/1B - Thesis/proposals/spatialmicrosim/viz/est2_v2.png)
+
+## Estimation of Affected Workers
+
+The estimation of the geographical distribution of the affected worker can be seen in Figure 4.
+Selected variables to examine are (i) the share of informal workers in employment, (ii) the labour force participation rate, (iii) the unemployment rate, and (iv) average working hours.
+The value of each variable is the difference between two static models: the model for the year 2020, which represents the post-COVID outbreak, and the 2019 for pre-outbreak.
+
+Changes in the share of informal workers were concentrated in an area that spans from Kota Yogyakarta northward to Sleman.
+This pattern corresponds to the informal workers' distribution in 2019.
+One could suspect that this pattern signals the shift that happens for formal workers towards informal employment [@ing_indonesian_2022].
+
+The drop in average working hours is concentrated in Kota Yogyakarta and Sleman.
+This pattern corresponds with the distribution in the change of informal employment share.
+A drop in working hours could indicate that shift to informal work is reducing the amount of work in general.
+Alas, correlation does not imply causation and this should be taken with a massive grain of salt.
+The first two indicators together might point to the vulnerability of formal workers, while early on, I point out that informal jobs are more exposed to negative consequences.
+This sounds like contradiction, but @lewis_6_2021 found that industries which consist of predominantly formal jobs are not less vulnerable than those with mostly informal jobs. 
+
+I will discuss the labour force participation rate and unemployment rate together.
+This is due to the empirical evidence that a significant portion of the affected workers left the labour force altogether instead of trying to find a job in the pandemic (see Section 2).
+The difference in geographic pattern is seen between the two variables.
+A drop in labour force participation is seen near Kota Yogyakarta, particularly its southern side in Bantul.
+While the rise in the unemployment rate happens within Kota Yogyakarta and in most parts of Gunung Kidul.
+
+The share of labour force temporarily stood down or away from work is also concentrated around the urban centre.
+The highest concentration forms parallel north-south line on the eastern and western side of the urban centre.
+This pattern is rather unique and does not correspond to pattern of other variables.
+
+I provide two main takeaways from the results of the simulation.
+First, the spatial microsimulation method has the potential to alleviate the modifiable areal unit problem (MAUP).
+Notice how the concentration of values usually happens across the border, or even right at the border.
+Its ability to assign and disaggregate geography on my data is essential.
+The concentration of values could also happen in parts of a district that is unusually large, such as Gunung Kidul.
+This finding wouldn't be so obvious if district-level disaggregation is used (see Figure 1).
+
+Second, there are spatial patterns in various aspects of the local labour market.
+I would argue that geography is another essential factor in explaining the distribution of labour market outcomes.
+@edzes_working_2022 suggests that region plays an important role in the labour market given the spatial difference of opportunities.
+This aligns well with the previous findings of possible over-representation of vulnerable jobs and groups, complemented with synchronous geographical patterns of formal workers, rise in informality, and drop in average working hours.
+Although correlation doesn't imply causation, these results promise a way forward towards better understanding of the spatial nature of the labour market.
+
+# Concluding Remarks
+
+Identification is essential in addressing the need of the vulnerable and the affected during economic adverse shocks.
+This paper describes how a set of static spatial microsimulation models could be used to identify the geographic distribution of vulnerable demographic groups and the workers affected by the COVID-19 pandemic.
+I review the literature to give a direction on which labour market indicators and outcomes should be examined in this paper.
+Additionally, I also discuss how spatial microsimulation could fit into and improve the identification process through geographic targeting.
+
+The simulation process has generated results that could help policymaking by providing the geographic distribution of the vulnerable and the affected.
+It can reduce the severity of the modifiable areal unit problem (MAUP) through fine geographic disaggregation.
+The simulation process also helps with the understanding of the local labour market.
+Its estimation result tells a story where the local labour market has a spatial pattern.
+
+*SimJogja* also has the potential to be developed further.
+Indonesian Socio-economic Survey (Survey Sosioekonomi Nasional/SUSENAS) can be used instead of SAKERNAS to perform what-if analysis which is common among spatial microsimulation studies.
+We can use the survey to evaluate the geographic pattern in the difference of consumption levels with or without cash transfer, for example.
+The model can also be used to shed more light on the nature of the local labour market, particularly concerning the impact of COVID-19.
+For example, *SimJogja* can also examine the trajectory of socio-economic and labour market recovery across time, or provide the data to study the root cause of labour market changes and the nature of changes (e.g. what form of informal jobs arise in a particular area).
+Alas, this should be done with the caveat that the simulation will have a certain degree of inaccuracy and, therefore, should be used with caution.
+
+# References
+
+<div id="refs"></div>
+
+\newpage
+
+# Appendices{-}
+
+## List of Variables{-}
+
+### Constraint Variables{-}
+
+\begin{center}
+\begin{tabular}{ ||l l|| } 
+\hline
+Variables & Category \\
+\hline
+\multirow{14}{5em}{Age} & 1. 15 - 19 years old \\ 
+& 2. 20 - 24 years old \\
+& 3. 25 - 29 years old \\
+& 4. 30 - 34 years old \\
+& 5. 35 - 39 years old \\
+& 6. 40 - 44 years old \\
+& 7. 45 - 49 years old \\
+& 8. 50 - 54 years old \\
+& 9. 55 - 59 years old \\
+& 10. 60 - 64 years old \\
+& 11. 65 - 69 years old \\
+& 12. 70 - 74 years old \\
+& 13. 75 - 79 years old \\
+& 14. 80 years old and older \\ [0.5ex]
+\hline
+\multirow{2}{5em}{Gender} & 1. Male \\ 
+& 2. Female \\ [0.5ex]
+\hline
+\multirow{6}{5em}{Educational Attainment} & 1. Elementary School (SD) \\
+& 2. Junior High School (SMP) \\
+& 3. Senior High School (SMA) \\
+& 4. Vocational School (Diploma) \\
+& 5. University (Sarjana) \\
+& 6. Didn't Graduate Elementary School (SD) \\ [0.5ex]
+\hline
+\multirow{8}{5em}{Occupational Category} & 1. Out of Labour Force \\
+& 2. Unemployed \\
+& 3. Military/Police Force \\
+& 4. Public Service \\
+& 5. Agricultural Worker \\
+& 6. Entrepreneur/Business Owner \\
+& 7. Formal Sector (e.g. office worker) \\
+& 8. Other Occupations \\
+\hline
+
+\end{tabular}
+\end{center}
+
+### Target Variables{-}
+
+- Working Hours
+- Unemployment Rate
+- Labour Force Participation Rate
+- Share of Informal Worker
+- Share of Employed Women
+- Share of Employed Youth (15-29 years old)
+- Sectoral Share of Employment
+
+\newpage
+
+<!-- ## Summary Statistics of the Sample{-} -->
+
+\newpage
+
+## External Validation{-}
+
+\begin{center}
+{\setlength\tabcolsep{2pt}
+  \begin{longtable}{p{4cm}ccc | ccc}
+  \caption{External Validation of Target Variables}\\
+    \hline
+    \multirow{2}{*}{Variable} & \multicolumn{3}{c}{2019} & \multicolumn{3}{c}{2020}\\\cline{2-7}
+& Simulated & SAKERNAS & Difference & Simulated & SAKERNAS & Difference\\
+\hline
+Self-employed & 17.02 & 17.86 & -0.83 & 15.74 & 18.13 & -2.39 \\
+Self-employed with temporary/family/unpaid workers & 21.51 & 15.39 & 6.12 & 20.56 & 17.58 & 2.98 \\
+Self-employed with paid workers & 2.83 & 4.04 & -1.21 & 2.48 & 3.81 & -1.33 \\
+Employee & 44.26 & 43.77 & 0.49 & 42.26 & 38.78 & 3.48 \\
+Casual agricultural workers & 4.86 & 1.97 & 2.88 & 4.49 & 1.70 & 2.78 \\
+Casual non-agricultural workers & 7.32 & 5.12 & 2.20 & 8.63 & 5.52 & 3.11 \\
+Family/Unpaid Worker & 2.20 & 11.84 & -9.64 & 5.85 & 14.48 & -8.63 \\ [0.5ex]
+  \hline
+\bfseries Sectoral Share of Employment\\
+Agriculture & 27.78 & 19.36 & 8.42 & 27.31 & 20.17 & 7.13 \\
+Mining & 0.78 & 0.74 & 0.04 & 1.01 & 0.76 & 0.25 \\
+Manufacturing & 14.93 & 17.03 & -2.10 & 15.50 & 17.03 & -1.53 \\
+{Gas \& Electricity} & 0.18 & 0.17 & 0.01 & 0.12 & 0.13 & -0.01 \\
+{Water \& Waste} & 0.25 & 0.19 & 0.06 & 0.26 & 0.24 & 0.02 \\
+Construction & 8.53 & 6.65 & 1.88 & 7.77 & 6.02 & 1.76 \\
+Wholesale Trade & 14.74 & 19.03 & -4.29 & 16.43 & 21.02 & -4.59 \\
+{Transport \& Warehousing} & 2.90 & 3.95 & -1.04 & 2.47 & 3.44 & -0.97 \\
+{Accomodation \& FnB} & 7.78 & 9.39 & -1.60 & 6.47 & 8.24 & -1.77 \\
+{Information \& Communication} & 0.67 & 0.97 & -0.30 & 0.96 & 1.42 & -0.47 \\
+Financial Services & 1.17 & 1.52 & -0.34 & 1.00 & 1.36 & -0.36 \\
+Real Estate & 0.04 & 0.06 & -0.03 & 0.11 & 0.16 & -0.05 \\
+Business Services & 1.74 & 2.42 & -0.68 & 1.22 & 1.61 & -0.39 \\
+Public Services & 5.08 & 3.56 & 1.52 & 4.83 & 3.60 & 1.23 \\
+Educational Services & 5.41 & 6.88 & -1.47 & 4.98 & 6.15 & -1.17 \\
+Social Services & 1.80 & 2.15 & -0.35 & 1.76 & 2.13 & -0.36 \\
+Other Services & 6.22 & 5.95 & 0.27 & 7.80 & 6.52 & 1.28 \\[0.5ex]
+  \hline
+Working Hours & 36.421 & 37.153 & -0.73 & 34.796 & 35.340 & -0.54 \\
+Unemployment Rate & 5.54 & 3.04 & 2.50 & 5.59 & 5.38 & 0.21 \\
+Employment Rate & 91.65 & 94.57 & -2.92 & 91.10 & 91.38 & -0.28 \\
+Temporarily Away From Work & 2.81 & 2.39 & 0.41 & 3.31 & 3.24 & 0.07 \\
+Labour Force Participation Rate & 69.67 & 72.83 & -3.16 & 68.86 & 67.65 & 1.21 \\
+Share of Informal Workers & 50.50 & 50.23 & 0.27 & 51.17 & 53.14 & -1.97 \\
+Underemployment Rate & 3.40 & 3.24 & 0.16 & 6.31 & 5.31 & 1.01 \\
+Share of Women in Employment & 41.75 & 43.61 & -1.86 & 43.18 & 44.20 & -1.01 \\
+Share of Youth in Employment & 18.41 & 22.07 & -3.66 & 19.47 & 21.15 & -1.68 \\
+\hline
+\multicolumn{7}{l}{\small Note: Every variables are in percentage, except for working hours which is in average hours} \\
+\end{longtable}
+}
+\end{center}
